@@ -1016,3 +1016,20 @@ class ArbitraryFG(_GenericDevice):
             output (int, optional): Output channel. Defaults to 1.
         """
         self.resource.write(f":SOURce{output}:PHAS:SYNC")
+
+# Below - two utility classes which allow afg channel outputs
+# to be read (not set) in an OOP style, 
+# once instance object is created.
+
+# TODO: incorporate directly into ArbitraryFG class
+# such that parameters can be set, read, and automatically updated.
+
+class afg_waveform():
+    def __init__(self, instrument, channel):
+        self.ison, self.type, self.freq, self.amp, self.offset, self.phase = instrument.get_waveform(channel)
+        self.imped = instrument.get_impedance(channel)
+
+class afg_outputs():
+    def __init__(self, instrument):
+        self.ch1 = afg_waveform(instrument, 1)
+        self.ch2 = afg_waveform(instrument, 2)
