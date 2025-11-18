@@ -486,9 +486,19 @@ class Scope(_GenericDevice):
         for chan in channels:
              self.resource.write(f":CHAN{chan}:SCAL {scale}")
 
-    def get_yscale(self,channels: list = [1]):
+    def get_yscale(self, channels: list = [1]):
         for chan in channels:
             return self.resource.query_ascii_values(f":CHAN{chan}:SCAL?")[0]
+        
+    def get_trig_position(self):
+        """Queries the offset of the main time base (ie. the trigger position).
+        When the waveform trigger point is at the left (right) side of the screen center,
+        the horizontal position is a positive (negative) value.
+
+        Returns:
+           float: time [s]
+        """        
+        return self.resource.query_ascii_values("TIMebase:OFFSet?")[0]
 
 
     def measurement(self, channels: list = [1],
