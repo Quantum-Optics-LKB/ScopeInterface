@@ -80,7 +80,7 @@ class SpectrumAnalyzer(_GenericDevice):
     def zero_span(self, center: float = 1e6, rbw: int = 100,
                   vbw: int = 30, swt: float = 'auto', 
                   trig: bool = None, single = False,
-                  plot: bool = False, barrier = None):
+                  plot: bool = False, barrier = None, arm_only = False):
         """Zero span measurement.
 
         (!) For long sweep times, use single sweep mode
@@ -95,6 +95,7 @@ class SpectrumAnalyzer(_GenericDevice):
         :param bool plot: option to plot
         :param barrier: <multiprocessing.Barrier> instance,
            useful for synchronizing multiple processes (measurements)
+        :param bool arm_only: if True, function returns after arming trigger
         :return: data, time for data and time
         :rtype: np.ndarray
 
@@ -164,6 +165,9 @@ class SpectrumAnalyzer(_GenericDevice):
                     else:
                         self.resource.write(':INITiate:IMMediate; *OPC')
             triginfo_msg = ' on trigger' if set_trigstate == 'EXT' else ''
+            if arm_only:
+                print(f"{self.short_name} | Armed for zero span scan (perform single sweep on trigger)")
+                return
             print(f'{self.short_name} | Getting zero span scan (single sweep' +
                   triginfo_msg + ')')
             # Poll the operation complete status in the event status 

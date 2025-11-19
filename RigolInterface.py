@@ -482,6 +482,23 @@ class Scope(_GenericDevice):
     def set_xres(self, res: float):
         self.resource.write_ascii_values(":WAV:XINC", res)
 
+    def get_xinc(self):
+        """Queries the time interval between two neighboring points of the currently selected
+        channel source in the X direction.
+
+        Returns:
+           float: time [s]
+        """        
+        return self.resource.query_ascii_values(":WAV:XINC?")[0]
+    
+    def get_xscale(self):
+        """Queries the scale of the main time base.
+
+        Returns:
+           float: time/div [s/div]
+        """        
+        return self.resource.query_ascii_values(":TIMebase:SCALe?")[0]
+
     def set_yscale(self, scale:float, channels : list = [1]):
         for chan in channels:
              self.resource.write(f":CHAN{chan}:SCAL {scale}")
