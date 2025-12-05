@@ -870,6 +870,25 @@ class ArbitraryFG(_GenericDevice):
         elif type(output) is int:
             output_impedance = float(self.resource.query(f':OUTP{output}:IMP?'))
         return output_impedance
+    
+    def set_voltage_unit(self, output: int = 1, unit: str = 'VPP'):
+        """
+        Sets the amplitude unit of the specified channel to 
+        Vpp (VPP), Vrms (VRMS), or dBm (DBM)
+        :param int output: Output channel
+        :param str unit: amplitude unit
+        :return: None
+        """
+        self.resource.write(f":SOURce{output}:VOLTage:UNIT {unit}")
+        
+    def get_voltage_unit(self, output: int = 1):
+        """
+        Returns the amplitude unit of the specified channel
+        :param int output: Output channel
+        :return: amplitude unit
+        """
+        unit = self.resource.query(f":SOURce{output}:VOLTage:UNIT?")
+        return unit.replace('\n','')
 
     def dc_offset(self, output: int = 1, offset: float = 2.0):
         """

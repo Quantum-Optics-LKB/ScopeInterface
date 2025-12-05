@@ -315,3 +315,20 @@ class SpectrumAnalyzer(_GenericDevice):
         data = rawdata.split(',')[:]
         data = [float(i) for i in data]
         return np.asarray(data)
+    
+    def read_channel_power(self):
+        """Returns a single value that corresponds to the Channel Power.
+        Does not preset the measurement to the factory default settings.
+        Initiates the measurement and puts valid data into the output buffer.
+
+        Uses integration bandwidth (IBW) method - important to set the 
+        resolution bandwidth correctly before making this measurement
+        using the following formula: RBW = k(span)/n Where k is 
+        a value between 1.2 and 4.0 and n is the number of trace points.
+        VBW should be ≥ 10 times the RBW. See reference manual.
+
+        :return: channel power (dBm)
+
+        """        
+        channel_power = self.resource.query(":READ:CHPower:CHPower?")
+        return float(channel_power.replace('\n',''))
