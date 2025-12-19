@@ -1062,20 +1062,168 @@ class ArbitraryFG(_GenericDevice):
             output (int, optional): Output channel. Defaults to 1.
         """
         self.resource.write(f":SOURce{output}:PHAS:SYNC")
+        
+""" 
+The following class replaces the ArbitraryFG class. In the new implementation,
+device and waveform parameters are defined as class properties,
+so that 'get' and 'set' functionalities are implicitly defined.
 
-# Below - two utility classes which allow afg channel outputs
-# to be read (not set) in an OOP style, 
-# once instance object is created.
+e.g. the frequency of Channel 1 can be set to 100 Hz by entering:
+    ch1.freq = 100
+    the frequency of Channel 1 can be accessed by entering:
+    ch1.freq
+"""
 
-# TODO: incorporate directly into ArbitraryFG class
-# such that parameters can be set, read, and automatically updated.
+class ArbitraryFG2(_GenericDevice):
+    """A class for controlling Rigol Arbitrary Function generators.
+    Each channel is represented by an instance of the inner class Channel.
+    Device settings and waveform parameters are accessed and set as attributes 
+    of the Channel class.
 
-class afg_waveform():
-    def __init__(self, instrument, channel):
-        self.ison, self.type, self.freq, self.amp, self.offset, self.phase = instrument.get_waveform(channel)
-        self.imped = instrument.get_impedance(channel)
+    """    
 
-class afg_outputs():
-    def __init__(self, instrument):
-        self.ch1 = afg_waveform(instrument, 1)
-        self.ch2 = afg_waveform(instrument, 2)
+    def __init__(self, address):
+        _GenericDevice.__init__(self, address)
+
+        # Inner class does not automatically have access to the outer class instance
+        # must pass the outer class instance as a parameter
+        self.ch1 = self.Channel(self, 1)
+        self.ch2 = self.Channel(self, 2)
+
+    class Channel():
+        def __init__(self, afg, channel):
+            self.afg = afg
+            self.channel = channel
+
+        @property
+        def type(self):
+            ret = self.afg.resource.query(f"SOURce{self.channel}:APPLy?")
+            return ret.strip().replace("\"","").split(",")[0]
+                   
+        @type.setter
+        def type(self, value):
+            waveform_types = ['SIN', 'SINusoid',
+                              'SQU', 'SQUare',
+                              'RAMP',
+                              'PULS', 'PULSe',
+                              'NOIS', 'NOISe',
+                              'DC',
+                              'USER']
+            if value.casefold() not in (wf_type.casefold() for wf_type in waveform_types):
+                raise Exception("Invalid waveform type specified.") 
+            self.afg.resource.write(f":SOURce{self.channel}:APPLy:{value}")
+
+        @property
+        def freq(self):
+            return float(self.afg.resource.query(f":SOURce{self.channel}:FREQ?").strip())
+        
+        @freq.setter
+        def freq(self, value):
+            if not isinstance(value, (int, float)) and value.casefold() != "DEF".casefold():
+                # for some waveforms frequency is not defined (e.g. noise)
+                raise TypeError("Frequency must be int or float")
+            self.afg.resource.write(f":SOURce{self.channel}:FREQ {value}")
+
+        @property
+        def amp(self):
+            return float(self.afg.resource.query(f":SOURce{self.channel}:VOLT?").strip())
+        
+        @amp.setter
+        def amp(self, value):
+            if not isinstance(value, (int, float)):
+                raise TypeError("Amplitude must be int or float")
+            self.afg.resource.write(f":SOURce{self.channel}:VOLT {value}")
+
+        @property
+        def offset(self):
+            return float(self.afg.resource.query(f":SOURce{self.channel}:VOLT:OFFS?").strip())
+        
+        @offset.setter
+        def offset(self, value):
+            if not isinstance(value, (int, float)):
+                raise TypeError("Offset must be int or float")
+            self.afg.resource.write(f":SOURce{self.channel}:VOLT:OFFS {value}")
+
+        @property
+        def phase(self):
+            return float(self.afg.resource.query(f":SOURce{self.channel}:PHAS?").strip())
+
+        @phase.setter
+        def phase(self, value):
+            if not isinstance(value, (int, float)):
+                 raise TypeError("Phase must be int or float")
+            self.afg.resource.write(f":SOURce{self.channel}:PHAS {value}")
+
+        @property
+        def imped(self):
+            return float(self.afg.resource.query(f":OUTPut{self.channel}:IMPedance?").strip())
+
+        @imped.setter
+        def imped(self, value):
+            if not isinstance(value, (int, float)) and value.casefold() != "INF".casefold():
+                 raise TypeError("Output impedance must be int, float, or 'INF'")
+            self.afg.resource.write(f":OUTPut{self.channel}:IMPedance {value}")
+
+        @property
+        def on(self):
+            ret = self.afg.resource.query(f":OUTPut{self.channel}?").strip()
+            if ret == "ON":
+                return True
+            elif ret == "OFF":
+                return False
+
+        @on.setter
+        def on(self, value):
+            if (not (0 or 1) and value.casefold() not in ["ON".casefold(), "OFF".casefold()]):
+                raise TypeError("Instrument output state must be boolean, 'ON', or 'OFF'")
+            self.afg.resource.write(f":OUTPut{self.channel} {int(value)}")
+
+        def align(self):
+            """Reconfigures output of specified channel to align phase with other output channel.
+            The phases specified for the channels may still differ - this function aligns their phase references.
+
+            Args:
+                output (int, optional): Output channel. Defaults to 1.
+            """
+            self.afg.resource.write(f":SOURce{self.channel}:PHAS:SYNC")
+        
+        def waveform(self, type = None, freq = None, amp = None, 
+                     offset = None, phase = None, imped = None):
+            # A function which allows multiple waveform parameters to be set at once
+            if type is not None:
+                self.type = type
+            if freq is not None:
+                self.freq = freq
+            if amp is not None:
+                self.amp = amp
+            if offset is not None:
+                self.offset = offset
+            if phase is not None:
+                self.phase = phase
+            if imped is not None:
+                self.imped = imped
+        
+        # def query_waveform(self):
+        #         """Queries the waveform type, frequency, amplitude, offset, and phase
+
+        #         Returns:
+        #             list: type, frequency (Hz), amplitude (Vpp), offset (Vdc), phase (°)
+        #         """                
+        #         # In order that amplitude is always returned in Vpp,
+        #         # change unit to Vpp before query. Otherwise, value 
+        #         # is returned in whatever unit user specified
+        #         amp_unit =  self.afg.resource.query(f"SOURce{self.channel}:VOLT:UNIT?").replace('\n','')
+        #         self.afg.resource.write(f"SOURce{self.channel}:VOLT:UNIT VPP")
+            
+        #         ret = self.afg.resource.query(f"SOURce{self.channel}:APPLy?")
+        #         ret = ret.strip().replace("\"","").split(",")
+
+        #         for i in range(len(ret)):
+        #             try:
+        #                 ret[i] = float(ret[i])
+        #             except ValueError: # When generating noise, phase and freq are undefined
+        #                 pass
+
+        #         # Change amplitude unit back to whatever user had set
+        #         self.afg.resource.write(f"SOURce{self.channel}:VOLT:UNIT {amp_unit}")
+        #         return ret
