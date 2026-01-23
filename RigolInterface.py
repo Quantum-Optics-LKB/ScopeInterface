@@ -88,7 +88,8 @@ class _Preamble:
 class Scope(_GenericDevice):
 
     def get_waveform_raw(self, channels: list = [1], memdepth: str | int = None,
-                          single = False, plot: bool = False, ndivs: int = None, 
+                          single = False, plot: bool = False, ndivs: int = None,
+                          start: int = 1, stop: int = None,
                           barrier = None) -> np.ndarray:
         """
         Gets the entire waveform data in the internal memory for a selection of channels
@@ -102,6 +103,9 @@ class Scope(_GenericDevice):
         :param int ndivs: The number of time divisions on the screen.
                 Defaults to None. If possible (depends on scope model),
                 ndivs is set by query to oscilloscope.
+        :param int start: Set start position of waveform data reading, defaults to 1.
+        :param int stop: Set stop position of waveform data reading, 
+            included in interval, defaults to maximum memory depth.
         :param <multiprocessing.Barrier> barrier (optional): Useful for
                 synchronizing multiple processes (measurements)
         :returns: Data, Time np.ndarrays containing the traces of shape
@@ -201,42 +205,40 @@ class Scope(_GenericDevice):
             self.resource.write(":WAV:MODE RAW")
             # Set return format to Byte.
             self.resource.write(":WAV:FORM BYTE")
-            # Set waveform read start to 0.
-            self.resource.write(":WAV:STAR 1")
-            if (memory_depth > 250000):
-                # Set waveform read stop to 250000.
-                self.resource.write(":WAV:STOP 250000")
-            else:
-                self.resource.write(f":WAV:STOP {int(memory_depth)}")
-            # Read data from the resource, excluding the first 9 bytes
-            # (TMC header).
-            rawdata = self.resource.query_binary_values(":WAV:DATA?",
-                                                        datatype='B')
-            sys.stdout.write(f"\rReading {len(rawdata)}/{memory_depth}")
-            # Check if memory depth is bigger than the first data extraction.
-            if (memory_depth > 250000):
-                # Find the maximum number of loops required to loop through all
-                # memory.
-                loopmax = int(np.ceil(memory_depth/250000))
-                for loopcount in range(1, loopmax):
-                    # Calculate the next start of the waveform in the internal
-                    # memory.
-                    start = (loopcount*250000)+1
-                    self.resource.write(f":WAV:STAR {start}")
-                    # Calculate the next stop of the waveform in the internal
-                    # memory
-                    stop = (loopcount+1)*250000
-                    sys.stdout.write(f"\rReading {stop}/{memory_depth}")
-                    self.resource.write(f":WAV:STOP {stop}")
+            # Set start position of waveform data reading
+            self.resource.write(f":WAV:STAR {int(start)}")
+
+            if stop is None:
+                stop = memory_depth
+            n_points = stop - start + 1 #+1 because both endpoints are included
+
+            if (n_points > 250000):
+                # Read 250000 points at a time, provide completion updates             
+                loopmax = int(np.ceil(n_points/250000))
+                rawdata = []
+                for loopcount in range(0, loopmax):
+                    iteration_start = (loopcount*250000) + start
+                    # iteration_stop is included in interval, hence -1
+                    iteration_stop = min(iteration_start + 250000 - 1, stop)
+                    self.resource.write(f":WAV:STAR {iteration_start}")
+                    self.resource.write(f":WAV:STOP {iteration_stop}")
+                    sys.stdout.write(f"\rReading {iteration_stop - start + 1}/{n_points}")
                     # Extent the rawdata variables with the new values.
                     rawdata.extend(self.resource.query_binary_values(":WAV:DATA?",
                                    datatype='B'))
+            else:
+                # Read whole waveform in one go
+                self.resource.write(f":WAV:STOP {int(stop)}")
+                # Read data from the resource, excluding the first 9 bytes
+                # (TMC header).
+                sys.stdout.write(f"\rReading {n_points}/{n_points}")
+                rawdata = self.resource.query_binary_values(":WAV:DATA?",
+                                                        datatype='B')
+
             data = (np.asarray(rawdata) - YORigin - YREFerence) * YINCrement
             Data.append(data)
-            # Calculate data size for generating time axis
-            data_size = len(data)
             # Create time axis
-            times = np.linspace(XREFerence, XINCrement*data_size, data_size)
+            times = np.linspace(XREFerence, XINCrement*len(data), len(data))
             Time.append(times)
         if plot: 
             # Assumes waveforms all have same time axis
@@ -255,6 +257,39 @@ class Scope(_GenericDevice):
             Data = Data[0, :]
             Time = Time[0, :]
         return Time, Data
+
+    def get_wf_fromtrig(self, timespan,
+                        channels: list = [1], memdepth: str | int = None,
+                        single = False, plot: bool = False, ndivs: int = None,) -> np.ndarray:
+        """Get the raw wavefrom from oscilloscope for a specified time duration
+          starting from the trigger.
+
+        Args:
+            timespan (float): duration of retrieved waveform.
+            See get_waveform_raw for info on other parameters.
+
+        Returns:
+            np.ndarray, np.ndarray : Data, Time arrays of shape
+            (channels, nbr of points) if len(channels)>1
+        """        
+        
+        # Determine index of trigger for raw waveform
+        XORigin = self.resource.query_ascii_values(":WAV:XOR?")[0]
+        XINCrement = self.resource.query_ascii_values(":WAV:XINC?")[0]
+        trig_index = int(abs(XORigin)/XINCrement)
+
+        # Determine index of final point to retrieve
+        n_points = int(timespan / XINCrement)
+        endpoint = trig_index + n_points - 1 #-1 because endpoint is retrieved
+
+        # Call get_waveform_raw
+        return self.get_waveform_raw(channels = channels,
+                                     memdepth = memdepth,
+                                     single = single,
+                                     plot = plot,
+                                     ndivs = ndivs,
+                                     start = trig_index,
+                                     stop = endpoint)
 
     def get_waveform(self, channels: list = [1], memdepth: str | int = None,
                      single = False, plot: bool = False,
@@ -516,7 +551,6 @@ class Scope(_GenericDevice):
            float: time [s]
         """        
         return self.resource.query_ascii_values("TIMebase:OFFSet?")[0]
-
 
     def measurement(self, channels: list = [1],
                     res: list = None):
