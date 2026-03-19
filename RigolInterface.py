@@ -1199,6 +1199,20 @@ class ArbitraryFG2(_GenericDevice):
             self.afg.resource.write(f":OUTPut{self.channel}:IMPedance {value}")
 
         @property
+        def symm(self):
+            """Ramp symmetry defined as the percentage that the rising period of the ramp takes up in the whole period."""
+            return float(self.afg.resource.query(f":SOURce{self.channel}:FUNCtion:RAMP:SYMMetry?").strip())
+        
+        @symm.setter
+        def symm(self, value):
+            try:
+                if not 0 < value < 100:
+                    raise Exception("Ramp symmetry must be between 0 and 100.")
+            except TypeError:
+                raise TypeError("Ramp symmetry must be int or float.")
+            self.afg.resource.write(f":SOURce{self.channel}:FUNCtion:RAMP:SYMMetry {value}")
+
+        @property
         def on(self):
             ret = self.afg.resource.query(f":OUTPut{self.channel}?").strip()
             if ret == "ON":
@@ -1209,8 +1223,36 @@ class ArbitraryFG2(_GenericDevice):
         @on.setter
         def on(self, value):
             if (not (0 or 1) and value.casefold() not in ["ON".casefold(), "OFF".casefold()]):
-                raise TypeError("Instrument output state must be boolean, 'ON', or 'OFF'")
+                raise TypeError("Output state must be boolean, 'ON', or 'OFF'")
             self.afg.resource.write(f":OUTPut{self.channel} {int(value)}")
+
+        @property
+        def sync_on(self):
+            ret = self.afg.resource.query(f":OUTPut{self.channel}:SYNC?").strip()
+            if ret == "ON":
+                return True
+            elif ret == "OFF":
+                return False
+
+        @sync_on.setter
+        def sync_on(self, value):
+            if (not (0 or 1) and value.casefold() not in ["ON".casefold(), "OFF".casefold()]):
+                raise TypeError("Sync output state must be boolean, 'ON', or 'OFF'")
+            self.afg.resource.write(f":OUTPut{self.channel}:SYNC {int(value)}")
+
+        @property
+        def sync_pol(self):
+            """Output polarity of the sync signal on the rear-panel [Sync/Ext Mod/Trig/FSK] connector of the specified channel"""
+            return self.afg.resource.query(f":OUTPut{self.channel}:SYNC:POLarity?").strip()
+
+        @sync_pol.setter
+        def sync_pol(self, value):
+            if self.sync_on is False:
+                raise Exception("Sync output state must be ON to set the polarity.")
+            sync_pol_options = ['POS', 'POSitive', 'NEG', 'NEGative']
+            if value.casefold() not in (option.casefold() for option in sync_pol_options):
+                raise Exception("Sync polarity must be specifed as \"positive\" or \"negative\".") 
+            self.afg.resource.write(f":OUTPut{self.channel}:SYNC:POLarity {value}")
 
         def align(self):
             """Reconfigures output of specified channel to align phase with other output channel.
@@ -1222,7 +1264,8 @@ class ArbitraryFG2(_GenericDevice):
             self.afg.resource.write(f":SOURce{self.channel}:PHAS:SYNC")
         
         def waveform(self, type = None, freq = None, amp = None, 
-                     offset = None, phase = None, imped = None):
+                     offset = None, phase = None, imped = None,
+                     symm = None):
             # A function which allows multiple waveform parameters to be set at once
             if type is not None:
                 self.type = type
@@ -1236,6 +1279,8 @@ class ArbitraryFG2(_GenericDevice):
                 self.phase = phase
             if imped is not None:
                 self.imped = imped
+            if symm is not None:
+                self.symm = symm
         
         # def query_waveform(self):
         #         """Queries the waveform type, frequency, amplitude, offset, and phase
