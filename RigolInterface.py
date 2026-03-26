@@ -1271,14 +1271,16 @@ class ArbitraryFG2(_GenericDevice):
                 self.type = type
             if freq is not None:
                 self.freq = freq
+            # Must set impedance before amplitude
+            # otherwise amplitude is changed by generator when impedance is changed
+            if imped is not None:
+                self.imped = imped
             if amp is not None:
                 self.amp = amp
             if offset is not None:
                 self.offset = offset
             if phase is not None:
                 self.phase = phase
-            if imped is not None:
-                self.imped = imped
             if symm is not None:
                 self.symm = symm
         
