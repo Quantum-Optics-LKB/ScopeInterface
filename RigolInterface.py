@@ -1,8 +1,10 @@
+import os
+import sys
 import numpy as np
 import matplotlib.pyplot as plt
 from time import sleep, time
-import os
-import sys
+import warnings
+from tqdm.auto import tqdm
 
 # Directory containing GenericDevice must be in path
 # Add parent directory of current file to path
@@ -1283,28 +1285,129 @@ class ArbitraryFG2(_GenericDevice):
                 self.phase = phase
             if symm is not None:
                 self.symm = symm
-        
-        # def query_waveform(self):
-        #         """Queries the waveform type, frequency, amplitude, offset, and phase
 
-        #         Returns:
-        #             list: type, frequency (Hz), amplitude (Vpp), offset (Vdc), phase (°)
-        #         """                
-        #         # In order that amplitude is always returned in Vpp,
-        #         # change unit to Vpp before query. Otherwise, value 
-        #         # is returned in whatever unit user specified
-        #         amp_unit =  self.afg.resource.query(f"SOURce{self.channel}:VOLT:UNIT?").replace('\n','')
-        #         self.afg.resource.write(f"SOURce{self.channel}:VOLT:UNIT VPP")
+        @property
+        def arb_srate(self):
+            # sampling rate for arbitrary waveform output
+            if 'DG4202' in self.afg.identity:
+                # Sampling rate is fixed
+                return 500e6 # 1/[s]
+            else:
+                return float(self.afg.resource.query(f":SOURce{self.channel}:FUNCtion:SEQuence:SRATe?").strip())
             
-        #         ret = self.afg.resource.query(f"SOURce{self.channel}:APPLy?")
-        #         ret = ret.strip().replace("\"","").split(",")
+        @arb_srate.setter
+        def arb_srate(self, value):
 
-        #         for i in range(len(ret)):
-        #             try:
-        #                 ret[i] = float(ret[i])
-        #             except ValueError: # When generating noise, phase and freq are undefined
-        #                 pass
+            if 'DG2102' in self.afg.identity:
 
-        #         # Change amplitude unit back to whatever user had set
-        #         self.afg.resource.write(f"SOURce{self.channel}:VOLT:UNIT {amp_unit}")
-        #         return ret
+                extrema = ['minimum', 'maximum', 'min', 'max']
+
+                if isinstance(value, (int, float)):
+                    if not 2e3 <= value <= 60e6:  # [Sa]/[s]
+                        raise Exception(("Sample rate"
+                        " for arbitrary waveform must be between 2 kSa/s and 60 MSa/s.")) 
+                elif value.casefold() in [extremum.casefold() for extremum in extrema]:
+                    pass
+                else:
+                    raise Exception("Invalid sample rate specified.") 
+                
+                self.afg.resource.write(f":SOURce{self.channel}:FUNCtion:SEQuence:SRATe {value}")
+
+            elif 'DG4202' in self.afg.identity:
+                raise Exception("Sample rate cannot be specifed for DG4202.") 
+
+        def arbitrary(self, waveform, stepbystep = True):
+            """Transmit user-defined arbitrary waveform 
+            to digital function generator.
+
+            Args:
+                waveform (numpy.ndarray): 1-D array containing points
+                    defining the waveform. Points correspond to 
+                    vertical levels of instrument and are cast to integer
+                    values. Points must be within range defined by
+                    instrument. The allowed waveform length depends on 
+                    the instrument.
+                stepbystep (bool, optional): If True, enable step-by-step 
+                    output of arbitrary waveform for DG4202. In this mode,
+                    every point of waveform is output at sample rate.
+                    The DG2102 always outputs arbitrary waveforms in 
+                    step-be-step mode.
+
+            Raises:
+                Exception: For the DG2102, waveform must contain 
+                    between 8 and 16777216 points.
+                Exception: For the DG2102, waveform values must be 
+                    in range [-32768, 32767].
+                Exception: For the DG4202, the waveform must contain 
+                    16384 points.
+                Exception: For the DG4202, waveform values must be 
+                    in range [0, 16383].
+                    
+            Returns:
+                int: length of waveform
+            """    
+            # Check input and raise exceptions
+
+            if not all(level.is_integer() for level in waveform):
+                warnings.warn(("Waveform defined with noninteger values,"
+                " casting to int16 (unsigned short)."))
+            
+            # astype('h') casts valuse to int16
+            max_level = np.max(waveform).astype('h') 
+            min_level = np.min(waveform).astype('h')
+
+            if 'DG2102' in self.afg.identity:
+                if not 8 <= len(waveform) <= 2**24:
+                    raise Exception("Waveform must contain between 8 and 16777216 points.")
+                if max_level > 2**15 - 1 or min_level < -2**15:
+                    raise Exception("Waveform values must be in range [-32768, 32767].")
+                if max_level != 2**15 - 1 or min_level != -2**15:
+                    warnings.warn("Not exploiting full dynamic range of 2^16 levels for waveform.")
+
+            elif 'DG4202' in self.afg.identity:
+                if len(waveform) != 2**14:
+                    raise Exception("Waveform must contain 16384 points.")
+                if max_level > 2**14 - 1 or min_level < 0:
+                    raise Exception("Waveform values must be in range [0, 16383].")
+                if max_level != 2**14 - 1 or min_level != 0:
+                    warnings.warn("Not exploiting full dynamic range of 2^14 levels for waveform.")
+
+            # Transfer data in packets of 2**14 points
+            # plus final packet containing remaining points 
+
+            # Split data into packets
+            n_full = len(waveform) // 2**14
+            extra_pts = len(waveform) % 2**14
+
+            if extra_pts == 0:
+                datapacks = np.split(waveform, n_full)
+            else:
+                datapacks = np.split(waveform[:-extra_pts], n_full)
+                datapacks.append(waveform[-extra_pts:])
+
+            # Transmit data to instrument
+            for pack in tqdm(datapacks[:-1]):
+                _ = self.afg.resource.write_binary_values(
+                    (f":SOURce{self.channel}:TRACe:DATA:DAC16 VOLATILE,CON,"),
+                    pack,
+                    datatype='h')
+                sleep(0.04)
+
+            _ = self.afg.resource.write_binary_values(
+                (f":SOURce{self.channel}:TRACe:DATA:DAC16 VOLATILE,END,"),
+                datapacks[-1],
+                datatype='h')
+            
+            if stepbystep is True and 'DG4202' in self.afg.identity:
+                self.afg.resource.write(f":SOURce{self.channel}:FUNCtion:ARB:STEP")
+
+            print(f"Loaded waveform of {len(waveform)} points.")
+
+            print(f"Arbitrary waveform sample rate: {self.arb_srate/1e6} MHz")
+
+            # If output is step-by-step, print waveform repetition rate
+            if 'DG2102' in self.afg.identity or ('DG4202' in self.afg.identity
+                                                  and self.freq == 30517.58):
+                print(f"Arbitrary waveform repetition rate: {self.arb_srate/len(waveform)} Hz")
+
+            return len(waveform)
