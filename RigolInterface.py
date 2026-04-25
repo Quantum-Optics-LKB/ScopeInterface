@@ -490,35 +490,15 @@ class Scope(_GenericDevice):
             plt.show()
         return np.asarray(Time), np.asarray(Data)
 
-    def set_xref(self, ref: float):
-        """
-        Sets the x reference
-        :param ref: Reference point
-        :type ref: float
-        :return: None
-        :rtype: None
+    def get_srate(self):
+        """Query the current sample rate. The default unit is Sa/s.
 
-        """
-
-        try:
-            self.resource.write_ascii_values(":WAV:XREF", ref)
-        except (ValueError or TypeError or AttributeError):
-            print("Improper value for XREF !")
-        self.xref = self.resource.query_ascii_values(":WAV:XREF?")[0]
-
-    def set_yref(self, ref: float, channel: list = [1]):
-        try:
-            self.resource.write_ascii_values(":WAV:YREF", ref)
-        except (ValueError or TypeError or AttributeError):
-            print("Improper value for YREF !")
-        self.xref = self.resource.query_ascii_values(":WAV:YREF?")[0]
-
-    def set_yres(self, res: float):
-        self.resource.write_ascii_values(":WAV:YINC", res)
-
-    def set_xres(self, res: float):
-        self.resource.write_ascii_values(":WAV:XINC", res)
-
+        Returns:
+            float: sampling rate
+        """        
+        srate = float(self.resource.query(":ACQuire:SRATe?"))
+        return srate
+    
     def get_xinc(self):
         """Queries the time interval between two neighboring points of the currently selected
         channel source in the X direction.
@@ -534,7 +514,7 @@ class Scope(_GenericDevice):
         Returns:
            float: time/div [s/div]
         """        
-        return self.resource.query_ascii_values(":TIMebase:SCALe?")[0]
+        return float(self.resource.query_ascii_values(":TIMebase:SCALe?")[0])
 
     def set_yscale(self, scale:float, channels : list = [1]):
         for chan in channels:
@@ -553,13 +533,22 @@ class Scope(_GenericDevice):
            float: time [s]
         """        
         return self.resource.query_ascii_values("TIMebase:OFFSet?")[0]
+    
+    def get_ndivs(self):
+        # get number of horizontal grids on the screen,
+        # ndivs is fixed for each instrument
+        return int(self.resource.query_ascii_values(":SYSTem:GAM?")[0])
 
-    def measurement(self, channels: list = [1],
-                    res: list = None):
-        if list is not (None) and len(list) == 2:
-            self.xres = self.set_xres(res[0])
-            self.yres = self.set_yres(res[1])
-        Data, Time = self.get_waveform(channels=channels)
+    def get_length(self):
+        """The waveform length is obtained by multiplying the horizontal 
+        time base by the number of grids in the horizontal direction.
+
+        Returns:
+            float: waveform length [s]
+        """        
+        time_scale = self.get_xscale()
+        ndivs = self.get_ndivs()
+        return time_scale * ndivs
 
     def get_screenshot(self, filename: str = None, format: str = 'png'):
         """
@@ -582,15 +571,6 @@ class Scope(_GenericDevice):
                 fs.write(raw_img)
         return img
     
-    def get_sampling_rate(self):
-        """Query the current sample rate. The default unit is Sa/s.
-
-        Returns:
-            float: sampling rate
-        """        
-        srate = float(self.resource.query(":ACQuire:SRATe?"))
-        return srate
-
     def close(self):
         self.resource.write(":RUN")
         self.resource.close()
@@ -1397,6 +1377,16 @@ class ArbitraryFG2(_GenericDevice):
                 (f":SOURce{self.channel}:TRACe:DATA:DAC16 VOLATILE,END,"),
                 datapacks[-1],
                 datatype='h')
+            
+            """When 'END' is sent, the instrument should automatically
+            switch to arbitrary waveform output. There is a bug with 
+            the DG2102 - if multiple datapackets are sent,
+            the instrument does not automatically switch to arbitrary 
+            waveform output. The following command ensures that the 
+            instrument switches to output the arbitrary waveform. """
+
+            if 'DG2102' in self.afg.identity:
+                self.afg.resource.write(f":SOURce{self.channel}:APPLy:SEQ")
             
             if stepbystep is True and 'DG4202' in self.afg.identity:
                 self.afg.resource.write(f":SOURce{self.channel}:FUNCtion:ARB:STEP")
