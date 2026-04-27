@@ -1330,11 +1330,14 @@ class ArbitraryFG2(_GenericDevice):
 
             if not all(level.is_integer() for level in waveform):
                 warnings.warn(("Waveform defined with noninteger values,"
-                " casting to int16 (unsigned short)."))
+                " casting to int16 (unsigned short). Consider rounding!"))
+                # values will be cast as np.ndarray.astype('h')
             
-            # astype('h') casts valuse to int16
-            max_level = np.max(waveform).astype('h') 
-            min_level = np.min(waveform).astype('h')
+            # Below, astype(int) is used instead of astype('h'),
+            # as the latter permits "round tripping",
+            # e.g., np.float64(2**15).astype('h') returns np.int16(-32768)
+            max_level = np.max(waveform).astype(int)
+            min_level = np.min(waveform).astype(int)
 
             if 'DG2102' in self.afg.identity:
                 if not 8 <= len(waveform) <= 2**24:
