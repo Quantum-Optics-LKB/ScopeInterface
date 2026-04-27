@@ -102,9 +102,7 @@ class Scope(_GenericDevice):
             defaults to None (does not modify)
         :param boolean single: Use single trigger mode
         :param bool plot: Will plot the traces
-        :param int ndivs: The number of time divisions on the screen.
-                Defaults to None. If possible (depends on scope model),
-                ndivs is set by query to oscilloscope.
+        :param int ndivs: DEPRECATED, now set by query to oscilloscope.
         :param int start: Set start position of waveform data reading, defaults to 1.
         :param int stop: Set stop position of waveform data reading, 
             included in interval, defaults to maximum memory depth.
@@ -143,9 +141,8 @@ class Scope(_GenericDevice):
 
         # Set memory depth if specified
         if memdepth is not None:
-            prev_memdepth = self.resource.query(":ACQuire:MDEPth?").replace('\n','')
-            if prev_memdepth != 'AUTO':
-                prev_memdepth = int(float(prev_memdepth))
+            prev_memdepth = self.get_mdepth()
+
             if prev_memdepth != memdepth:
                 if trig_status == "STOP\n":
                     # Memory depth cannot be set while oscilloscope is in STOP state
@@ -156,22 +153,7 @@ class Scope(_GenericDevice):
                     self.resource.query(f":ACQuire:MDEPth {int(memdepth)};*OPC?")
 
         # Get memory depth
-        memory_depth = self.resource.query(":ACQuire:MDEPth?").replace('\n','')
-        if memory_depth == 'AUTO': # Some scope models return 'AUTO', others return actual integer
-            # In this case, must calculate memdepth: memdepth = sample rate x waveform length,
-            # where waveform length is horizontal timebase x ndivs
-            sample_rate = float(self.resource.query(':ACQuire:SRATe?'))
-            time_scale = float(self.resource.query_ascii_values(":TIMebase:SCALe?")[0])
-            # ndivs is number of horizontal grids on the screen
-            if ndivs == None:
-                try:
-                    ndivs = int(self.resource.query_ascii_values(":SYSTem:GAMount?")[0])
-                except Exception:
-                    sys.exit("ERROR: ndivs must be specified manually for this oscilloscope.")
-            waveform_length = time_scale * ndivs
-            memory_depth = int(round(sample_rate*waveform_length))
-        else:
-            memory_depth = int(float(memory_depth))
+        memory_depth = self.get_mdepth()
 
         # Measure waveform, afterwards scope must be in STOP state to read from internal memory
         if single:
@@ -263,7 +245,7 @@ class Scope(_GenericDevice):
     def get_wf_fromtrig(self, timespan,
                         channels: list = [1], memdepth: str | int = None,
                         single = False, plot: bool = False, ndivs: int = None,) -> np.ndarray:
-        """Get the raw wavefrom from oscilloscope for a specified time duration
+        """Get the raw waveform from oscilloscope for a specified time duration
           starting from the trigger.
 
         Args:
@@ -314,9 +296,7 @@ class Scope(_GenericDevice):
                 defaults to None (does not modify)
             single (boolean, optional): Use single trigger mode
             plot (bool, optional): Whether to plot the result. Defaults to False.
-            ndivs (int, optional): The number of time divisions on the screen.
-                Defaults to None. If possible (depends on scope model),
-                ndivs is set by query to oscilloscope.
+            ndivs (int, optional): DEPRECATED, now set by query to oscilloscope.
             barrier (<multiprocessing.Barrier>, optional): Useful for
                 synchronizing multiple processes (measurements)
         Returns:
@@ -352,9 +332,8 @@ class Scope(_GenericDevice):
 
         # Set memory depth if specified
         if memdepth is not None:
-            prev_memdepth = self.resource.query(":ACQuire:MDEPth?").replace('\n','')
-            if prev_memdepth != 'AUTO':
-                prev_memdepth = int(float(prev_memdepth))
+            prev_memdepth = self.get_mdepth()
+
             if prev_memdepth != memdepth:
                 if trig_status == "STOP\n":
                     # Memory depth cannot be set while oscilloscope is in STOP state
@@ -365,26 +344,14 @@ class Scope(_GenericDevice):
                     self.resource.query(f":ACQuire:MDEPth {int(memdepth)};*OPC?")
         
         # ndivs is number of horizontal grids on the screen
-        if ndivs == None:
-            try:
-                ndivs = int(self.resource.query_ascii_values(":SYSTem:GAMount?")[0])
-            except Exception:
-                sys.exit("ERROR: ndivs must be specified manually for this oscilloscope.")
+        ndivs = self.get_ndivs()
 
         # get horizontal timebase
-        time_scale = float(self.resource.query_ascii_values(":TIMebase:SCALe?")[0])
+        time_scale = self.get_xscale()
         # get sample rate
-        sample_rate = float(self.resource.query(':ACQuire:SRATe?'))
-
+        sample_rate = self.get_srate()
         # Get memory depth
-        memory_depth = self.resource.query(":ACQuire:MDEPth?").replace('\n','')
-        if memory_depth == 'AUTO': # Some scope models return 'AUTO', others return actual integer
-            # In this case, must calculate memdepth: memdepth = sample rate x waveform length,
-            # where waveform length is horizontal timebase x ndivs
-            waveform_length = time_scale * ndivs
-            memory_depth = int(round(sample_rate*waveform_length))
-        else:
-            memory_depth = int(float(memory_depth))
+        memory_depth = self.get_mdepth()
 
         # Exit before measurement if data transfer from scope will be unsuccessful
         x_inc = 1/sample_rate
@@ -489,6 +456,16 @@ class Scope(_GenericDevice):
             ax.legend()
             plt.show()
         return np.asarray(Time), np.asarray(Data)
+    
+    def get_mdepth(self):
+        mdepth = self.resource.query(":ACQuire:MDEPth?").strip()
+        try:
+            mdepth = int(float(mdepth))
+        except Exception: # query can return "AUTO"
+             if mdepth == 'AUTO':
+                self.resource.write(":WAVeform:MODE RAW")
+                mdepth = int(float(self.resource.query(":WAVeform:STOP?").strip()))
+        return mdepth
 
     def get_srate(self):
         """Query the current sample rate. The default unit is Sa/s.
@@ -539,16 +516,26 @@ class Scope(_GenericDevice):
         # ndivs is fixed for each instrument
         return int(self.resource.query_ascii_values(":SYSTem:GAM?")[0])
 
-    def get_length(self):
-        """The waveform length is obtained by multiplying the horizontal 
-        time base by the number of grids in the horizontal direction.
+    def get_dur_scr(self):
+        """Return duration of waveform displayed on the screen
 
         Returns:
             float: waveform length [s]
         """        
+        # Get duration of displayed waveform
+        # obtained by multiplying the horizontal 
+        # time base by the number of grids in the horizontal direction.
         time_scale = self.get_xscale()
         ndivs = self.get_ndivs()
         return time_scale * ndivs
+    
+    def get_dur_raw(self, onscreen = False):
+        """Return duration of waveform in internal memory
+
+        Returns:
+            float: waveform length [s]
+        """        
+        return self.get_mdepth() / self.get_srate()
 
     def get_screenshot(self, filename: str = None, format: str = 'png'):
         """
