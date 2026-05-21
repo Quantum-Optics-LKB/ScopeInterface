@@ -1223,6 +1223,23 @@ class ArbitraryFG2(_GenericDevice):
                 raise Exception("Sync polarity must be specifed as \"positive\" or \"negative\".") 
             self.afg.resource.write(f":OUTPut{self.channel}:SYNC:POLarity {value}")
 
+        @property
+        def sync_mode(self):
+            if 'DG2102' in self.afg.identity:
+                return "N/A" # DG2102 has no Sync Mode feature
+            else:
+                return self.afg.resource.query(f":OUTPut{self.channel}:SYNC:MODE?").strip()
+        
+        @sync_mode.setter
+        def sync_mode(self, value):
+            if 'DG2102' in self.afg.identity:
+                raise Exception("DG2102 does not have Sync Mode feature.")
+            else:
+                sync_modes = ["carr", "carrier", "norm", "normal"]
+                if value.casefold() not in [mode.casefold() for mode in sync_modes]:
+                    raise TypeError("Invalid sync mode specified.")
+                self.afg.resource.write(f":OUTPut{self.channel}:SYNC:MODE {value}")                
+
         def align(self):
             """Reconfigures output of specified channel to align phase with other output channel.
             The phases specified for the channels may still differ - this function aligns their phase references.
