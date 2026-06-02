@@ -1408,3 +1408,25 @@ class ArbitraryFG2(_GenericDevice):
                 print(f"Arbitrary waveform repetition rate: {self.arb_srate/len(waveform)} Hz")
 
             return len(waveform)
+        
+        @property
+        def seq_filt(self):
+            # Sequence filter type
+            if 'DG4202' in self.afg.identity:
+                return "N/A"
+            else:
+                return self.afg.resource.query(f":SOURce{self.channel}:FUNCtion:SEQuence:FILTer?").strip()
+            
+        @seq_filt.setter
+        def seq_filt(self, value):
+
+            if 'DG4202' in self.afg.identity:
+                raise Exception("Sequence filter is not a valid setting for DG4202.")
+            else:
+                filters = ['SMOOth', 'smoo',
+                           'STEP',
+                           'INSErt', 'inse']
+                if value.casefold() not in (filt.casefold() for filt in filters):
+                    raise Exception("Invalid Sequence filter type specified.")
+                
+                self.afg.resource.write(f":SOURce{self.channel}:FUNCtion:SEQuence:FILTer {value}")
