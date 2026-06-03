@@ -1094,13 +1094,15 @@ class ArbitraryFG2(_GenericDevice):
         self.ch2 = self.Channel(self, 2)
 
     class Channel():
-        def __init__(self, afg, channel):
+        def __init__(self, afg, number):
             self.afg = afg
-            self.channel = channel
+            self.number = number
+            self.am = self.AM(self)
+            self.pm = self.PM(self)
 
         @property
         def type(self):
-            ret = self.afg.resource.query(f"SOURce{self.channel}:APPLy?")
+            ret = self.afg.resource.query(f"SOURce{self.number}:APPLy?")
             return ret.strip().replace("\"","").split(",")[0]
                    
         @type.setter
@@ -1114,63 +1116,62 @@ class ArbitraryFG2(_GenericDevice):
                               'USER']
             if value.casefold() not in (wf_type.casefold() for wf_type in waveform_types):
                 raise Exception("Invalid waveform type specified.") 
-            self.afg.resource.write(f":SOURce{self.channel}:APPLy:{value}")
+            self.afg.resource.write(f":SOURce{self.number}:APPLy:{value}")
 
         @property
         def freq(self):
-            return float(self.afg.resource.query(f":SOURce{self.channel}:FREQ?").strip())
+            return float(self.afg.resource.query(f":SOURce{self.number}:FREQ?").strip())
         
         @freq.setter
         def freq(self, value):
-            if not isinstance(value, (int, float)) and value.casefold() != "DEF".casefold():
-                # for some waveforms frequency is not defined (e.g. noise)
+            if not isinstance(value, (int, float)):
                 raise TypeError("Frequency must be int or float")
-            self.afg.resource.write(f":SOURce{self.channel}:FREQ {value}")
+            self.afg.resource.write(f":SOURce{self.number}:FREQ {value}")
 
         @property
         def amp(self):
-            return float(self.afg.resource.query(f":SOURce{self.channel}:VOLT?").strip())
+            return float(self.afg.resource.query(f":SOURce{self.number}:VOLT?").strip())
         
         @amp.setter
         def amp(self, value):
             if not isinstance(value, (int, float)):
                 raise TypeError("Amplitude must be int or float")
-            self.afg.resource.write(f":SOURce{self.channel}:VOLT {value}")
+            self.afg.resource.write(f":SOURce{self.number}:VOLT {value}")
 
         @property
         def offset(self):
-            return float(self.afg.resource.query(f":SOURce{self.channel}:VOLT:OFFS?").strip())
+            return float(self.afg.resource.query(f":SOURce{self.number}:VOLT:OFFS?").strip())
         
         @offset.setter
         def offset(self, value):
             if not isinstance(value, (int, float)):
                 raise TypeError("Offset must be int or float")
-            self.afg.resource.write(f":SOURce{self.channel}:VOLT:OFFS {value}")
+            self.afg.resource.write(f":SOURce{self.number}:VOLT:OFFS {value}")
 
         @property
         def phase(self):
-            return float(self.afg.resource.query(f":SOURce{self.channel}:PHAS?").strip())
+            return float(self.afg.resource.query(f":SOURce{self.number}:PHAS?").strip())
 
         @phase.setter
         def phase(self, value):
             if not isinstance(value, (int, float)):
                  raise TypeError("Phase must be int or float")
-            self.afg.resource.write(f":SOURce{self.channel}:PHAS {value}")
+            self.afg.resource.write(f":SOURce{self.number}:PHAS {value}")
 
         @property
         def imped(self):
-            return float(self.afg.resource.query(f":OUTPut{self.channel}:IMPedance?").strip())
+            return float(self.afg.resource.query(f":OUTPut{self.number}:IMPedance?").strip())
 
         @imped.setter
         def imped(self, value):
             if not isinstance(value, (int, float)) and value.casefold() != "INF".casefold():
                  raise TypeError("Output impedance must be int, float, or 'INF'")
-            self.afg.resource.write(f":OUTPut{self.channel}:IMPedance {value}")
+            self.afg.resource.write(f":OUTPut{self.number}:IMPedance {value}")
 
         @property
         def symm(self):
             """Ramp symmetry defined as the percentage that the rising period of the ramp takes up in the whole period."""
-            return float(self.afg.resource.query(f":SOURce{self.channel}:FUNCtion:RAMP:SYMMetry?").strip())
+            return float(self.afg.resource.query(f":SOURce{self.number}:FUNCtion:RAMP:SYMMetry?").strip())
         
         @symm.setter
         def symm(self, value):
@@ -1179,11 +1180,11 @@ class ArbitraryFG2(_GenericDevice):
                     raise Exception("Ramp symmetry must be between 0 and 100.")
             except TypeError:
                 raise TypeError("Ramp symmetry must be int or float.")
-            self.afg.resource.write(f":SOURce{self.channel}:FUNCtion:RAMP:SYMMetry {value}")
+            self.afg.resource.write(f":SOURce{self.number}:FUNCtion:RAMP:SYMMetry {value}")
 
         @property
         def on(self):
-            ret = self.afg.resource.query(f":OUTPut{self.channel}?").strip()
+            ret = self.afg.resource.query(f":OUTPut{self.number}?").strip()
             if ret == "ON":
                 return True
             elif ret == "OFF":
@@ -1193,11 +1194,11 @@ class ArbitraryFG2(_GenericDevice):
         def on(self, value):
             if (not (0 or 1) and value.casefold() not in ["ON".casefold(), "OFF".casefold()]):
                 raise TypeError("Output state must be boolean, 'ON', or 'OFF'")
-            self.afg.resource.write(f":OUTPut{self.channel} {int(value)}")
+            self.afg.resource.write(f":OUTPut{self.number} {int(value)}")
 
         @property
         def sync_on(self):
-            ret = self.afg.resource.query(f":OUTPut{self.channel}:SYNC?").strip()
+            ret = self.afg.resource.query(f":OUTPut{self.number}:SYNC?").strip()
             if ret == "ON":
                 return True
             elif ret == "OFF":
@@ -1207,12 +1208,12 @@ class ArbitraryFG2(_GenericDevice):
         def sync_on(self, value):
             if (not (0 or 1) and value.casefold() not in ["ON".casefold(), "OFF".casefold()]):
                 raise TypeError("Sync output state must be boolean, 'ON', or 'OFF'")
-            self.afg.resource.write(f":OUTPut{self.channel}:SYNC {int(value)}")
+            self.afg.resource.write(f":OUTPut{self.number}:SYNC {int(value)}")
 
         @property
         def sync_pol(self):
             """Output polarity of the sync signal on the rear-panel [Sync/Ext Mod/Trig/FSK] connector of the specified channel"""
-            return self.afg.resource.query(f":OUTPut{self.channel}:SYNC:POLarity?").strip()
+            return self.afg.resource.query(f":OUTPut{self.number}:SYNC:POLarity?").strip()
 
         @sync_pol.setter
         def sync_pol(self, value):
@@ -1221,14 +1222,14 @@ class ArbitraryFG2(_GenericDevice):
             sync_pol_options = ['POS', 'POSitive', 'NEG', 'NEGative']
             if value.casefold() not in (option.casefold() for option in sync_pol_options):
                 raise Exception("Sync polarity must be specifed as \"positive\" or \"negative\".") 
-            self.afg.resource.write(f":OUTPut{self.channel}:SYNC:POLarity {value}")
+            self.afg.resource.write(f":OUTPut{self.number}:SYNC:POLarity {value}")
 
         @property
         def sync_mode(self):
             if 'DG2102' in self.afg.identity:
                 return "N/A" # DG2102 has no Sync Mode feature
             else:
-                return self.afg.resource.query(f":OUTPut{self.channel}:SYNC:MODE?").strip()
+                return self.afg.resource.query(f":OUTPut{self.number}:SYNC:MODE?").strip()
         
         @sync_mode.setter
         def sync_mode(self, value):
@@ -1238,7 +1239,7 @@ class ArbitraryFG2(_GenericDevice):
                 sync_modes = ["carr", "carrier", "norm", "normal"]
                 if value.casefold() not in [mode.casefold() for mode in sync_modes]:
                     raise TypeError("Invalid sync mode specified.")
-                self.afg.resource.write(f":OUTPut{self.channel}:SYNC:MODE {value}")                
+                self.afg.resource.write(f":OUTPut{self.number}:SYNC:MODE {value}")                
 
         def align(self):
             """Reconfigures output of specified channel to align phase with other output channel.
@@ -1247,7 +1248,7 @@ class ArbitraryFG2(_GenericDevice):
             Args:
                 output (int, optional): Output channel. Defaults to 1.
             """
-            self.afg.resource.write(f":SOURce{self.channel}:PHAS:SYNC")
+            self.afg.resource.write(f":SOURce{self.number}:PHAS:SYNC")
         
         def waveform(self, type = None, freq = None, amp = None, 
                      offset = None, phase = None, imped = None,
@@ -1277,7 +1278,7 @@ class ArbitraryFG2(_GenericDevice):
                 # Sampling rate is fixed
                 return 500e6 # 1/[s]
             else:
-                return float(self.afg.resource.query(f":SOURce{self.channel}:FUNCtion:SEQuence:SRATe?").strip())
+                return float(self.afg.resource.query(f":SOURce{self.number}:FUNCtion:SEQuence:SRATe?").strip())
             
         @arb_srate.setter
         def arb_srate(self, value):
@@ -1295,7 +1296,7 @@ class ArbitraryFG2(_GenericDevice):
                 else:
                     raise Exception("Invalid sample rate specified.") 
                 
-                self.afg.resource.write(f":SOURce{self.channel}:FUNCtion:SEQuence:SRATe {value}")
+                self.afg.resource.write(f":SOURce{self.number}:FUNCtion:SEQuence:SRATe {value}")
 
             elif 'DG4202' in self.afg.identity:
                 raise Exception("Sample rate cannot be specifed for DG4202.") 
@@ -1375,13 +1376,13 @@ class ArbitraryFG2(_GenericDevice):
             # Transmit data to instrument
             for pack in tqdm(datapacks[:-1]):
                 _ = self.afg.resource.write_binary_values(
-                    (f":SOURce{self.channel}:TRACe:DATA:DAC16 VOLATILE,CON,"),
+                    (f":SOURce{self.number}:TRACe:DATA:DAC16 VOLATILE,CON,"),
                     pack,
                     datatype='h')
                 sleep(0.04)
 
             _ = self.afg.resource.write_binary_values(
-                (f":SOURce{self.channel}:TRACe:DATA:DAC16 VOLATILE,END,"),
+                (f":SOURce{self.number}:TRACe:DATA:DAC16 VOLATILE,END,"),
                 datapacks[-1],
                 datatype='h')
             
@@ -1393,10 +1394,10 @@ class ArbitraryFG2(_GenericDevice):
             instrument switches to output the arbitrary waveform. """
 
             if 'DG2102' in self.afg.identity:
-                self.afg.resource.write(f":SOURce{self.channel}:APPLy:SEQ")
+                self.afg.resource.write(f":SOURce{self.number}:APPLy:SEQ")
             
             if stepbystep is True and 'DG4202' in self.afg.identity:
-                self.afg.resource.write(f":SOURce{self.channel}:FUNCtion:ARB:STEP")
+                self.afg.resource.write(f":SOURce{self.number}:FUNCtion:ARB:STEP")
 
             print(f"Loaded waveform of {len(waveform)} points.")
 
@@ -1415,7 +1416,7 @@ class ArbitraryFG2(_GenericDevice):
             if 'DG4202' in self.afg.identity:
                 return "N/A"
             else:
-                return self.afg.resource.query(f":SOURce{self.channel}:FUNCtion:SEQuence:FILTer?").strip()
+                return self.afg.resource.query(f":SOURce{self.number}:FUNCtion:SEQuence:FILTer?").strip()
             
         @seq_filt.setter
         def seq_filt(self, value):
@@ -1429,4 +1430,213 @@ class ArbitraryFG2(_GenericDevice):
                 if value.casefold() not in (filt.casefold() for filt in filters):
                     raise Exception("Invalid Sequence filter type specified.")
                 
-                self.afg.resource.write(f":SOURce{self.channel}:FUNCtion:SEQuence:FILTer {value}")
+                self.afg.resource.write(f":SOURce{self.number}:FUNCtion:SEQuence:FILTer {value}")
+
+        @property
+        def mod_on(self):
+            """ON/OFF status of the modulation function
+            """            
+            ret = self.afg.resource.query(f":SOURce{self.number}:MOD:STATe?").strip()
+            if ret == "ON":
+                return True
+            elif ret == "OFF":
+                return False
+        
+        @mod_on.setter
+        def mod_on(self, value):
+            if (not (0 or 1) and value.casefold() not in ["ON".casefold(), "OFF".casefold()]):
+                raise TypeError("Output state must be boolean, 'ON', or 'OFF'")
+            self.afg.resource.write(f":SOURce{self.number}:MOD:STATe {int(value)}")
+
+        @property
+        def mod_type(self):
+            """Modulation type
+            """            
+            return self.afg.resource.query(f":SOURce{self.number}:MOD:TYPe?").strip()
+
+        @mod_type.setter
+        def mod_type(self, value):
+            mod_types = ['AM', 'FM', 'PM', 'ASK', 'FSK', 'PSK', 'PWM']
+            if value.casefold() not in (t.casefold() for t in mod_types):
+                    raise Exception("Invalid modulation type specified.")
+            self.afg.resource.write(f":SOURce{self.number}:MOD:TYPe {value}")
+
+        class PM():
+            def __init__(self, channel): 
+                # channel is outer class instance
+                self.channel = channel
+
+            @property
+            def on(self):
+                """ON/OFF status of phase modulation
+                """            
+                ret = self.channel.afg.resource.query(f":SOURce{self.channel.number}:MOD:PM:STATe?").strip()
+                if ret == "ON":
+                    return True
+                elif ret == "OFF":
+                    return False
+            
+            @on.setter
+            def on(self, value):
+                if (not (0 or 1) and value.casefold() not in ["ON".casefold(), "OFF".casefold()]):
+                    raise TypeError("Output state must be boolean, 'ON', or 'OFF'")
+                self.channel.afg.resource.write(f":SOURce{self.channel.number}:MOD:PM:STATe {int(value)}")
+
+            @property
+            def deviation(self):
+                """PM phase deviation [degrees]
+                """            
+                return float(self.channel.afg.resource.query(f":SOURce{self.channel.number}:MOD:PM:DEViation?").strip())
+            
+            @deviation.setter
+            def deviation(self, value):
+                
+                extrema = ['minimum', 'maximum', 'min', 'max']
+
+                if isinstance(value, (int, float)):
+                    if not 0 <= value <= 360:
+                        raise Exception("Deviation must be between 0° and 360°")
+                elif value.casefold() not in [extremum.casefold() for extremum in extrema]:
+                    raise Exception("Invalid deviation specified.") 
+                self.channel.afg.resource.write(f":SOURce{self.channel.number}:MOD:PM:DEViation {value}")
+                  
+            @property
+            def freq(self):
+                """PM modulation frequency
+                """            
+                return float(self.channel.afg.resource.query(f":SOURce{self.channel.number}:MOD:PM:INTernal:FREQuency?").strip())
+            
+            @freq.setter
+            def freq(self, value):
+                if not isinstance(value, (int, float)):
+                    raise TypeError("Frequency must be int or float")
+                self.channel.afg.resource.write(f":SOURce{self.channel.number}:MOD:PM:INTernal:FREQuency {value}")
+
+            @property
+            def function(self):
+                """PM modulation waveform
+                """            
+                return self.channel.afg.resource.query(f":SOURce{self.channel.number}:MOD:PM:INTernal:FUNCtion?").strip()
+            
+            @function.setter
+            def function(self, value):
+                
+                functions = ['SIN', 'SINusoid',
+                             'SQU', 'SQUare',
+                             'TRI', 'TRIangle',
+                             'RAMP',
+                             'NRAMp',
+                             'NOIS', 'NOISe',
+                             'USER']
+
+                if value.casefold() not in (f.casefold() for f in functions):
+                    raise Exception("Invalid modulation function specified.")  
+                
+                self.channel.afg.resource.write(f":SOURce{self.channel.number}:MOD:PM:INTernal:FUNCtion {value}")
+            
+            @property
+            def source(self):
+                """PM modulation source (can be internal or external)
+                """            
+                return self.channel.afg.resource.query(f":SOURce{self.channel.number}:MOD:PM:SOURce?").strip()
+            
+            @source.setter
+            def source(self, value):
+                
+                sources = ['INT', 'INTernal',
+                           'EXT', 'EXTernal',]
+
+                if value.casefold() not in (s.casefold() for s in sources):
+                    raise Exception("Source must be specified as 'Internal' or 'External'.")  
+                
+                self.channel.afg.resource.write(f":SOURce{self.channel.number}:MOD:PM:SOURce {value}")
+
+        class AM():
+            def __init__(self, channel): 
+                # channel is outer class instance
+                self.channel = channel
+
+            @property
+            def on(self):
+                """ON/OFF status of amplitude modulation
+                """            
+                ret = self.channel.afg.resource.query(f":SOURce{self.channel.number}:MOD:AM:STATe?").strip()
+                if ret == "ON":
+                    return True
+                elif ret == "OFF":
+                    return False
+            
+            @on.setter
+            def on(self, value):
+                if (not (0 or 1) and value.casefold() not in ["ON".casefold(), "OFF".casefold()]):
+                    raise TypeError("Output state must be boolean, 'ON', or 'OFF'")
+                self.channel.afg.resource.write(f":SOURce{self.channel.number}:MOD:AM:STATe {int(value)}")
+
+            @property
+            def depth(self):
+                """AM modulation depth [%]
+                """            
+                return float(self.channel.afg.resource.query(f":SOURce{self.channel.number}:MOD:AM:DEPTh?").strip())
+            
+            @depth.setter
+            def depth(self, value):
+                
+                extrema = ['minimum', 'maximum', 'min', 'max']
+
+                if isinstance(value, (int, float)):
+                    if not 0 <= value <= 120:
+                        raise Exception(r"AM modulation depth must be between 0% and 120%")
+                elif value.casefold() not in [extremum.casefold() for extremum in extrema]:
+                    raise Exception("Invalid AM modulation depth specified.") 
+                self.channel.afg.resource.write(f":SOURce{self.channel.number}:MOD:AM:DEPTh {value}")
+                  
+            @property
+            def freq(self):
+                """AM modulation frequency
+                """            
+                return float(self.channel.afg.resource.query(f":SOURce{self.channel.number}:MOD:AM:INTernal:FREQuency?").strip())
+            
+            @freq.setter
+            def freq(self, value):
+                if not isinstance(value, (int, float)):
+                    raise TypeError("Frequency must be int or float")
+                self.channel.afg.resource.write(f":SOURce{self.channel.number}:MOD:AM:INTernal:FREQuency {value}")
+
+            @property
+            def function(self):
+                """AM modulation waveform
+                """            
+                return self.channel.afg.resource.query(f":SOURce{self.channel.number}:MOD:AM:INTernal:FUNCtion?").strip()
+            
+            @function.setter
+            def function(self, value):
+                
+                functions = ['SIN', 'SINusoid',
+                             'SQU', 'SQUare',
+                             'TRI', 'TRIangle',
+                             'RAMP',
+                             'NRAMp',
+                             'NOIS', 'NOISe',
+                             'USER']
+
+                if value.casefold() not in (f.casefold() for f in functions):
+                    raise Exception("Invalid modulation function specified.")  
+                
+                self.channel.afg.resource.write(f":SOURce{self.channel.number}:MOD:AM:INTernal:FUNCtion {value}")
+            
+            @property
+            def source(self):
+                """AM modulation source (can be internal or external)
+                """            
+                return self.channel.afg.resource.query(f":SOURce{self.channel.number}:MOD:AM:SOURce?").strip()
+            
+            @source.setter
+            def source(self, value):
+                
+                sources = ['INT', 'INTernal',
+                           'EXT', 'EXTernal',]
+
+                if value.casefold() not in (s.casefold() for s in sources):
+                    raise Exception("Source must be specified as 'Internal' or 'External'.")  
+                
+                self.channel.afg.resource.write(f":SOURce{self.channel.number}:MOD:AM:SOURce {value}")
