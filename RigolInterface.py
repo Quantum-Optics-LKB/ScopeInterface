@@ -1192,10 +1192,15 @@ class ArbitraryFG2(_GenericDevice):
 
         @on.setter
         def on(self, value):
-            if (not (0 or 1) and value.casefold() not in ["ON".casefold(), "OFF".casefold()]):
+            if (isinstance(value, bool) or value == 0 or value == 1):
+                self.afg.resource.write(f":OUTPut{self.number} {int(value)}")
+            elif value.casefold() == "ON".casefold():
+                self.afg.resource.write(f":OUTPut{self.number} ON")
+            elif value.casefold() == "OFF".casefold():
+                self.afg.resource.write(f":OUTPut{self.number} OFF")
+            else:
                 raise TypeError("Output state must be boolean, 'ON', or 'OFF'")
-            self.afg.resource.write(f":OUTPut{self.number} {int(value)}")
-
+    
         @property
         def sync_on(self):
             ret = self.afg.resource.query(f":OUTPut{self.number}:SYNC?").strip()
@@ -1206,10 +1211,15 @@ class ArbitraryFG2(_GenericDevice):
 
         @sync_on.setter
         def sync_on(self, value):
-            if (not (0 or 1) and value.casefold() not in ["ON".casefold(), "OFF".casefold()]):
+            if (isinstance(value, bool) or value == 0 or value == 1):
+                self.afg.resource.write(f":OUTPut{self.number}:SYNC {int(value)}")
+            elif value.casefold() == "ON".casefold():
+                self.afg.resource.write(f":OUTPut{self.number}:SYNC ON")
+            elif value.casefold() == "OFF".casefold():
+                self.afg.resource.write(f":OUTPut{self.number}:SYNC OFF")
+            else:
                 raise TypeError("Sync output state must be boolean, 'ON', or 'OFF'")
-            self.afg.resource.write(f":OUTPut{self.number}:SYNC {int(value)}")
-
+            
         @property
         def sync_pol(self):
             """Output polarity of the sync signal on the rear-panel [Sync/Ext Mod/Trig/FSK] connector of the specified channel"""
@@ -1444,9 +1454,14 @@ class ArbitraryFG2(_GenericDevice):
         
         @mod_on.setter
         def mod_on(self, value):
-            if (not (0 or 1) and value.casefold() not in ["ON".casefold(), "OFF".casefold()]):
-                raise TypeError("Output state must be boolean, 'ON', or 'OFF'")
-            self.afg.resource.write(f":SOURce{self.number}:MOD:STATe {int(value)}")
+            if (isinstance(value, bool) or value == 0 or value == 1):
+                self.afg.resource.write(f":SOURce{self.number}:MOD:STATe {int(value)}")
+            elif value.casefold() == "ON".casefold():
+                self.afg.resource.write(f":SOURce{self.number}:MOD:STATe ON")
+            elif value.casefold() == "OFF".casefold():
+                self.afg.resource.write(f":SOURce{self.number}:MOD:STATe OFF")
+            else:
+                raise TypeError("Modulation state must be boolean, 'ON', or 'OFF'")
 
         @property
         def mod_type(self):
@@ -1478,9 +1493,14 @@ class ArbitraryFG2(_GenericDevice):
             
             @on.setter
             def on(self, value):
-                if (not (0 or 1) and value.casefold() not in ["ON".casefold(), "OFF".casefold()]):
-                    raise TypeError("Output state must be boolean, 'ON', or 'OFF'")
-                self.channel.afg.resource.write(f":SOURce{self.channel.number}:MOD:PM:STATe {int(value)}")
+                if (isinstance(value, bool) or value == 0 or value == 1):
+                    self.channel.afg.resource.write(f":SOURce{self.channel.number}:MOD:PM:STATe {int(value)}")
+                elif value.casefold() == "ON".casefold():
+                    self.channel.afg.resource.write(f":SOURce{self.channel.number}:MOD:PM:STATe ON")
+                elif value.casefold() == "OFF".casefold():
+                    self.channel.afg.resource.write(f":SOURce{self.channel.number}:MOD:PM:STATe OFF")
+                else:
+                    raise TypeError("PM modulation state must be boolean, 'ON', or 'OFF'")
 
             @property
             def deviation(self):
@@ -1568,9 +1588,14 @@ class ArbitraryFG2(_GenericDevice):
             
             @on.setter
             def on(self, value):
-                if (not (0 or 1) and value.casefold() not in ["ON".casefold(), "OFF".casefold()]):
-                    raise TypeError("Output state must be boolean, 'ON', or 'OFF'")
-                self.channel.afg.resource.write(f":SOURce{self.channel.number}:MOD:AM:STATe {int(value)}")
+                if (isinstance(value, bool) or value == 0 or value == 1):
+                    self.channel.afg.resource.write(f":SOURce{self.channel.number}:MOD:AM:STATe {int(value)}")
+                elif value.casefold() == "ON".casefold():
+                    self.channel.afg.resource.write(f":SOURce{self.channel.number}:MOD:AM:STATe ON")
+                elif value.casefold() == "OFF".casefold():
+                    self.channel.afg.resource.write(f":SOURce{self.channel.number}:MOD:AM:STATe OFF")
+                else:
+                    raise TypeError("AM modulation state must be boolean, 'ON', or 'OFF'")
 
             @property
             def depth(self):

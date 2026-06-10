@@ -196,13 +196,14 @@ class SpectrumAnalyzer(_GenericDevice):
             plt.show()
         return data, times
 
-    def span(self, center: float = 22.5e6, span: float = 45e6,
+    def spectrum(self, center: float = 22.5e6, span: float = 45e6,
                                      rbw: int = 100,
                                      vbw: int = 30, swt: float = 'auto',
                                      trig: bool = None, single = False,
                                      plot: bool = False) -> np.ndarray:
         """Configure and execute measurement of noise power spectrum
 
+        THIS FUNCTION WAS PREVIOUSLY NAMED "SPAN"
         THIS FUNCTION REPLACES NOW DEPRECATED FUNCTION <set_trace_parameters_and_get>
 
         This function should work identically to the <span> function defined in
@@ -316,8 +317,56 @@ class SpectrumAnalyzer(_GenericDevice):
         data = [float(i) for i in data]
         return np.asarray(data)
     
-    def read_channel_power(self):
-        """Returns a single value that corresponds to the Channel Power.
+
+    ### BANDwidth Subsection
+
+    @property
+    def rbw(self):
+        """Resolution bandwidth
+        """            
+        return float(self.resource.query(":SENSe:BANDwidth:RESolution?").strip())
+    
+    @rbw.setter
+    def rbw(self, value):      
+        self.resource.write(f":SENSe:BANDwidth:RESolution {value}")
+
+    @property
+    def vbw(self):
+        """Video bandwidth
+        """            
+        return float(self.resource.query(":SENSe:BANDwidth:VIDeo?").strip())
+    
+    @vbw.setter
+    def vbw(self, value):      
+        self.resource.write(f":SENSe:BANDwidth:VIDeo {value}")
+    
+    ### FREQuency Subsection
+    
+    @property
+    def center(self):
+        """Center frequency
+        """            
+        return float(self.resource.query(":SENSe:FREQuency:CENTer?").strip())
+    
+    @center.setter
+    def center(self, value):      
+        self.resource.write(f":SENSe:FREQuency:CENTer {value}")
+
+    @property
+    def span(self):
+        """Frequency span
+        """            
+        return float(self.resource.query(":SENSe:FREQuency:SPAN?").strip())
+    
+    @span.setter
+    def span(self, value):      
+        self.resource.write(f":SENSe:FREQuency:SPAN {value}")
+
+    ### Channel Power Measurement
+
+    def chpower_read(self, density = False):
+        """Returns a single value that corresponds to the Channel Power 
+        or Power Spectral Density.
         Does not preset the measurement to the factory default settings.
         Initiates the measurement and puts valid data into the output buffer.
 
@@ -327,8 +376,92 @@ class SpectrumAnalyzer(_GenericDevice):
         a value between 1.2 and 4.0 and n is the number of trace points.
         VBW should be ≥ 10 times the RBW. See reference manual.
 
-        :return: channel power (dBm)
+        Args:
+            density (bool, optional): If true, returns Power Spectral Density. 
+            Defaults to False.
 
+        Returns:
+            float: _channel power (dBm)
+        """
+        if density is False:
+            return float(self.resource.query(":READ:CHPower:CHPower?").strip())
+        else: 
+            return float(self.resource.query(":READ:CHPower:DENSity?").strip())
+            
+    @property
+    def chpower_avg_on(self):
+        """"ON/OFF status of averaging
+        """
+        return bool(int(self.resource.query(":SENSe:CHPower:AVERage:STATe?").strip()))
+
+    @chpower_avg_on.setter
+    def chpower_avg_on(self, value):
+        if (isinstance(value, bool) or value == 0 or value == 1):
+            self.resource.write(f":SENSe:CHPower:AVERage:STATe {int(value)}")
+        elif value.casefold() == "ON".casefold():
+            self.resource.write(":SENSe:CHPower:AVERage:STATe ON")
+        elif value.casefold() == "OFF".casefold():
+            self.resource.write(":SENSe:CHPower:AVERage:STATe OFF")
+        else:
+            raise ValueError("Averaging must be set as boolean, 'ON', or 'OFF'")
+
+    @property
+    def chpower_avg_num(self):
+        """"Number of measurements for averaging
+        """
+        return int(self.resource.query(":SENSe:CHPower:AVERage:COUNt?").strip())
+
+    @chpower_avg_num.setter
+    def chpower_avg_num(self, value):
+        if not isinstance(value, int):
+            raise TypeError("Number of measurements for averaging must be specifed with integer")
+        self.resource.write(f":SENSe:CHPower:AVERage:COUNt {value}")
+
+    @property
+    def chpower_avg_mode(self):
+        """"Determines the averaging action after the specified number of measurements 
+        (average count) is reached:
+
+        Exponential Averaging mode: each successive data acquisition after the average count is 
+        reached is exponentially weighted and combined with the existing average. 
+        Exponential averaging weights new data more than old data, which facilitates tracking of 
+        slow-changing signals. The average will be displayed at the end of each sweep.
+
+        Repeat mode: after reaching the average count, all previous result data is cleared and the 
+        average count is set back to 1
+        """
+        return self.resource.query(":SENSe:CHPower:AVERage:TCONtrol?").strip()
+
+    @chpower_avg_mode.setter
+    def chpower_avg_mode(self, value):
+        modes = ['EXPonential', 'EXP', 'REPeat', 'REP']
+        if value.casefold() not in (mode.casefold() for mode in modes):
+            raise Exception("Invalid averaging mode specified.")  
+        self.resource.write(f":SENSe:CHPower:AVERage:TCONtrol {value}")
+
+    @property
+    def chpower_integbw(self):
+        """Range of integration used in calculating the power in the channel
+        """            
+        return float(self.resource.query(":SENSe:CHPower:BANDwidth:INTegration?").strip())
+    
+    @chpower_integbw.setter
+    def chpower_integbw(self, value):      
+        self.resource.write(f":SENSe:CHPower:BANDwidth:INTegration {value}")
+
+    @property
+    def chpower_span(self):
+        """Analyzer span for the channel power measurement
+        """            
+        return float(self.resource.query(":SENSe:CHPower:FREQuency:SPAN?").strip())
+    
+    @chpower_span.setter
+    def chpower_span(self, value):      
+        self.resource.write(f":SENSe:CHPower:FREQuency:SPAN {value}")
+
+    def power_autorange(self):
+        """Sets the input attenuator and reference level to optimize the 
+        robustness of the measurement, which is its freedom from errors 
+        due to input compression and log amp range limitations.
         """        
-        channel_power = self.resource.query(":READ:CHPower:CHPower?")
-        return float(channel_power.replace('\n',''))
+        self.resource.write("POW:RANG:AUTO ONCE")
