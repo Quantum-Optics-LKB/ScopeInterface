@@ -781,6 +781,50 @@ class SpectrumAnalyzer(_GenericDevice):
         data = rawdata.split(', ')[1:]
         data = [float(i) for i in data]
         return np.asarray(data)
+    
+     ### BANDwidth Subsection
+
+    @property
+    def rbw(self):
+        """Resolution bandwidth
+        """            
+        return float(self.resource.query(":SENSe:BANDwidth:RESolution?").strip())
+    
+    @rbw.setter
+    def rbw(self, value):      
+        self.resource.write(f":SENSe:BANDwidth:RESolution {value}")
+
+    @property
+    def vbw(self):
+        """Video bandwidth
+        """            
+        return float(self.resource.query(":SENSe:BANDwidth:VIDeo?").strip())
+    
+    @vbw.setter
+    def vbw(self, value):      
+        self.resource.write(f":SENSe:BANDwidth:VIDeo {value}")
+    
+    ### FREQuency Subsection
+    
+    @property
+    def center(self):
+        """Center frequency
+        """            
+        return float(self.resource.query(":SENSe:FREQuency:CENTer?").strip())
+    
+    @center.setter
+    def center(self, value):      
+        self.resource.write(f":SENSe:FREQuency:CENTer {value}")
+
+    @property
+    def span(self):
+        """Frequency span
+        """            
+        return float(self.resource.query(":SENSe:FREQuency:SPAN?").strip())
+    
+    @span.setter
+    def span(self, value):      
+        self.resource.write(f":SENSe:FREQuency:SPAN {value}")
 
 
 class ArbitraryFG(_GenericDevice):
