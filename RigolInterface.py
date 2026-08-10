@@ -1137,6 +1137,30 @@ class ArbitraryFG2(_GenericDevice):
         self.ch1 = self.Channel(self, 1)
         self.ch2 = self.Channel(self, 2)
 
+    @property
+    def clock(self):
+        """Query reference clock source.
+
+        Returns:
+            str: 'INT' or 'EXT'
+        """        
+        return self.resource.query("SYSTem:ROSCillator:SOURce?").strip()
+    
+    @clock.setter
+    def clock(self, value):
+        # Set the reference clock source to INTernal or EXTernal.
+        sources = ['INT', 'INTernal',
+                   'EXT', 'EXTernal']
+        if value.casefold() not in (source.casefold() for source in sources):
+            raise Exception("Invalid clock source specified.") 
+        self.resource.write(f"SYSTem:ROSCillator:SOURce {value}")
+
+        # If system does not detect valid external clock source,
+        # it falls back to internal source
+        if value.casefold() == 'ext' or value.casefold() == 'external':
+            if self.clock != 'EXT':
+                raise Exception("Reference clock source could NOT be set to EXTERNAL.")
+
     class Channel():
         def __init__(self, afg, number):
             self.afg = afg
