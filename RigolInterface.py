@@ -1522,14 +1522,20 @@ class ArbitraryFG2(_GenericDevice):
         
         @mod_on.setter
         def mod_on(self, value):
+            # While DG2102 accepts ON|1|OFF|0 as parameters, DG4202 only accepts ON|OFF.
             if (isinstance(value, bool) or value == 0 or value == 1):
-                self.afg.resource.write(f":SOURce{self.number}:MOD:STATe {int(value)}")
+                if bool(value):
+                    state = 'ON'
+                else:
+                    state = "OFF"
             elif value.casefold() == "ON".casefold():
-                self.afg.resource.write(f":SOURce{self.number}:MOD:STATe ON")
+                state = 'ON'
             elif value.casefold() == "OFF".casefold():
-                self.afg.resource.write(f":SOURce{self.number}:MOD:STATe OFF")
+                state = 'OFF'
             else:
                 raise TypeError("Modulation state must be boolean, 'ON', or 'OFF'")
+            
+            self.afg.resource.write(f":SOURce{self.number}:MOD:STATe {state}")
 
         @property
         def mod_type(self):
@@ -1553,22 +1559,30 @@ class ArbitraryFG2(_GenericDevice):
             def on(self):
                 """ON/OFF status of phase modulation
                 """            
-                ret = self.channel.afg.resource.query(f":SOURce{self.channel.number}:MOD:PM:STATe?").strip()
-                if ret == "ON":
-                    return True
-                elif ret == "OFF":
-                    return False
+                if 'DG4202' in self.channel.afg.identity:
+                    raise Exception("DG4202 does not have commands to set/query state of specific modulation types. " \
+                    "Use mod_on property of Channel class instead.")
+                else:
+                    ret = self.channel.afg.resource.query(f":SOURce{self.channel.number}:MOD:PM:STATe?").strip()
+                    if ret == "ON":
+                        return True
+                    elif ret == "OFF":
+                        return False
             
             @on.setter
             def on(self, value):
-                if (isinstance(value, bool) or value == 0 or value == 1):
-                    self.channel.afg.resource.write(f":SOURce{self.channel.number}:MOD:PM:STATe {int(value)}")
-                elif value.casefold() == "ON".casefold():
-                    self.channel.afg.resource.write(f":SOURce{self.channel.number}:MOD:PM:STATe ON")
-                elif value.casefold() == "OFF".casefold():
-                    self.channel.afg.resource.write(f":SOURce{self.channel.number}:MOD:PM:STATe OFF")
+                if 'DG4202' in self.channel.afg.identity:
+                    raise Exception("DG4202 does not have commands to set/query state of specific modulation types. " \
+                    "Use mod_on property of Channel class instead.")
                 else:
-                    raise TypeError("PM modulation state must be boolean, 'ON', or 'OFF'")
+                    if (isinstance(value, bool) or value == 0 or value == 1):
+                        self.channel.afg.resource.write(f":SOURce{self.channel.number}:MOD:PM:STATe {int(value)}")
+                    elif value.casefold() == "ON".casefold():
+                        self.channel.afg.resource.write(f":SOURce{self.channel.number}:MOD:PM:STATe ON")
+                    elif value.casefold() == "OFF".casefold():
+                        self.channel.afg.resource.write(f":SOURce{self.channel.number}:MOD:PM:STATe OFF")
+                    else:
+                        raise TypeError("PM modulation state must be boolean, 'ON', or 'OFF'")
 
             @property
             def deviation(self):
@@ -1648,22 +1662,30 @@ class ArbitraryFG2(_GenericDevice):
             def on(self):
                 """ON/OFF status of amplitude modulation
                 """            
-                ret = self.channel.afg.resource.query(f":SOURce{self.channel.number}:MOD:AM:STATe?").strip()
-                if ret == "ON":
-                    return True
-                elif ret == "OFF":
-                    return False
+                if 'DG4202' in self.channel.afg.identity:
+                    raise Exception("DG4202 does not have commands to set/query state of specific modulation types. " \
+                    "Use mod_on property of Channel class instead.")
+                else:
+                    ret = self.channel.afg.resource.query(f":SOURce{self.channel.number}:MOD:AM:STATe?").strip()
+                    if ret == "ON":
+                        return True
+                    elif ret == "OFF":
+                        return False
             
             @on.setter
             def on(self, value):
-                if (isinstance(value, bool) or value == 0 or value == 1):
-                    self.channel.afg.resource.write(f":SOURce{self.channel.number}:MOD:AM:STATe {int(value)}")
-                elif value.casefold() == "ON".casefold():
-                    self.channel.afg.resource.write(f":SOURce{self.channel.number}:MOD:AM:STATe ON")
-                elif value.casefold() == "OFF".casefold():
-                    self.channel.afg.resource.write(f":SOURce{self.channel.number}:MOD:AM:STATe OFF")
+                if 'DG4202' in self.channel.afg.identity:
+                    raise Exception("DG4202 does not have commands to set/query state of specific modulation types. " \
+                    "Use mod_on property of Channel class instead.")
                 else:
-                    raise TypeError("AM modulation state must be boolean, 'ON', or 'OFF'")
+                    if (isinstance(value, bool) or value == 0 or value == 1):
+                        self.channel.afg.resource.write(f":SOURce{self.channel.number}:MOD:AM:STATe {int(value)}")
+                    elif value.casefold() == "ON".casefold():
+                        self.channel.afg.resource.write(f":SOURce{self.channel.number}:MOD:AM:STATe ON")
+                    elif value.casefold() == "OFF".casefold():
+                        self.channel.afg.resource.write(f":SOURce{self.channel.number}:MOD:AM:STATe OFF")
+                    else:
+                        raise TypeError("AM modulation state must be boolean, 'ON', or 'OFF'")
 
             @property
             def depth(self):
